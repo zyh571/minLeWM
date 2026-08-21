@@ -3,7 +3,7 @@ from torch import nn
 import math
 
 class MultiheadSelfAttention(nn.Module):
-    def __init__(self, d_model, num_heads):
+    def __init__(self, d_model, num_heads, drop):
         super().__init__()
         assert d_model % num_heads == 0
         self.d_model = d_model
@@ -13,6 +13,7 @@ class MultiheadSelfAttention(nn.Module):
         self.Wk = nn.Linear(d_model, d_model)
         self.Wv = nn.Linear(d_model, d_model)
         self.Wproj = nn.Linear(d_model, d_model)
+        self.drop = nn.Dropout(drop)
 
     def forward(self, x):
         B, T, D = x.shape
@@ -23,6 +24,7 @@ class MultiheadSelfAttention(nn.Module):
         # B, nh, T, T
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_head)
         attn_weights = torch.softmax(attn_scores, dim=-1)
+        attn_weights = self.drop(attn_weights)
 
         x = torch.matmul(attn_weights, v).transpose(1, 2).reshape(B, T, self.d_model)
         x = self.Wproj(x)
@@ -56,25 +58,26 @@ class FeedForward(nn.Module):
         return x        
     
 class ViTBlock(nn.Module):
-    def __init__(self, d_model, num_heads):
+    def __init__(self, d_model, num_heads, drop):
         super().__init__()
         self.norm1 = LayerNorm(d_model)
-        self.msa = MultiheadSelfAttention(d_model, num_heads)
+        self.msa = MultiheadSelfAttention(d_model, num_heads, drop)
         self.norm2 = LayerNorm(d_model)
         self.mlp = FeedForward(d_model)
+        self.drop = nn.Dropout(drop)
 
     def forward(self, x):
         h = self.norm1(x)
-        h = self.msa(h)
+        h = self.drop(self.msa(h))
         x = x + h
         h = self.norm2(x)
-        h = self.mlp(h)
+        h = self.drop(self.mlp(h))
         x = x + h
         return x
 
 class ViT(nn.Module):
     def __init__(self, img_channels=3, img_size=224, patch_size=14, 
-                 d_model=192, num_heads=3, num_layers=12):
+                 d_model=192, num_heads=3, num_layers=12, drop=0.1):
         super().__init__()
         assert img_size % patch_size == 0
         self.img_channels = img_channels
@@ -96,15 +99,16 @@ class ViT(nn.Module):
             torch.randn(self.num_patches+1, d_model)
         )
         self.blocks = nn.ModuleList(
-            [ViTBlock(d_model, num_heads) for l in range(num_layers)]
+            [ViTBlock(d_model, num_heads, drop) for l in range(num_layers)]
         )
+        self.drop = nn.Dropout(drop)
 
     def forward(self, x):
         B, _, _, _ = x.shape
         x = self.conv(x)
         x = x.reshape(B, self.d_model, self.num_patches).transpose(1, 2)
         x = torch.cat([self.cls_tok.expand(B, 1, -1), x], dim=1)
-        x = x + self.pos_emb
+        x = self.drop(x + self.pos_emb)
         for block in self.blocks:
             x = block(x)
 

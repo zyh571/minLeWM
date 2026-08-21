@@ -3,7 +3,7 @@ from torch import nn
 import math
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, num_heads, hist_len):
+    def __init__(self, d_model, num_heads, hist_len, drop):
         super().__init__()
         assert d_model % num_heads == 0
         self.d_model = d_model
@@ -13,7 +13,7 @@ class MultiHeadAttention(nn.Module):
         self.Wk = nn.Linear(d_model, d_model)
         self.Wv = nn.Linear(d_model, d_model)
         self.Wproj = nn.Linear(d_model, d_model)
-
+        self.drop = nn.Dropout(drop)
         mask = torch.triu(torch.full((hist_len, hist_len), float('-inf')), diagonal=1)
         self.register_buffer('mask', mask)
 
@@ -27,6 +27,7 @@ class MultiHeadAttention(nn.Module):
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_head)
         attn_scores = attn_scores + self.mask[None, None, :T, :T]
         attn_weights = torch.softmax(attn_scores, dim=-1)
+        attn_weights = self.drop(attn_weights)
 
         x = torch.matmul(attn_weights, v).transpose(1, 2).reshape(B, T, self.d_model)
         x = self.Wproj(x)
@@ -62,35 +63,35 @@ class FeedForward(nn.Module):
         return x        
     
 class AdaLNTransformerBlock(nn.Module):
-    def __init__(self, d_model, d_action, num_heads, hist_len):
+    def __init__(self, d_model, d_action, num_heads, hist_len, drop):
         super().__init__()
         self.norm1 = AdaptiveLayerNorm(d_model, d_action)
-        self.msa = MultiHeadAttention(d_model, num_heads, hist_len)
+        self.msa = MultiHeadAttention(d_model, num_heads, hist_len, drop)
         self.norm2 = AdaptiveLayerNorm(d_model, d_action)
         self.mlp = FeedForward(d_model)
+        self.drop = nn.Dropout(drop)
 
     def forward(self, x, a):
         h = self.norm1(x, a)
-        h = self.msa(h)
+        h = self.drop(self.msa(h))
         x = x + h
         h = self.norm2(x, a)
-        h = self.mlp(h)
+        h = self.drop(self.mlp(h))
         x = x + h
         return x
 
 class AdaLNTransformer(nn.Module):
-    def __init__(self, d_model=192, d_action=2, num_heads=16, hist_len=3, num_layers=6):
+    def __init__(self, d_model=192, d_action=2, num_heads=16, hist_len=3, num_layers=6, drop=0.1):
         super().__init__()
         self.pos_emb = nn.Parameter(torch.randn(hist_len, d_model))
         self.blocks = nn.ModuleList(
-            [AdaLNTransformerBlock(d_model, d_action, num_heads, hist_len) for l in range(num_layers)]
+            [AdaLNTransformerBlock(d_model, d_action, num_heads, hist_len, drop) for l in range(num_layers)]
         )
-
+        self.drop = nn.Dropout(drop)
     def forward(self, x, a):
-        x = x + self.pos_emb
+        x = self.drop(x + self.pos_emb)
         for block in self.blocks:
             x = block(x, a)
-
         return x
 
 if __name__ == '__main__':

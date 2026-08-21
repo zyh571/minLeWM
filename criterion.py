@@ -1,0 +1,64 @@
+import torch
+from torch import nn
+
+def make_quadrature(lam=1.0, T=16, t_min=0.2, t_max=4.0):
+    """Build quadrature knots and weights for the Epps-Pulley integral.
+    
+    Returns:
+        t_knots : (T,) frequency knots, uniformly spaced in [t_min, t_max]
+        weights : (T,) trapezoidal weights * Gaussian frequency weight w(t_k)
+    """
+    t_knots = torch.linspace(t_min, t_max, T)
+    dt = t_knots[1] - t_knots[0]
+    alpha = torch.full((T,), dt)         # trapezoidal weights
+    alpha[0]  *= 0.5               # endpoints get half weight
+    alpha[-1] *= 0.5
+    return t_knots, alpha * torch.exp(-t_knots ** 2 / (2 * lam ** 2))
+
+def random_unit_vectors(M, D):
+    """Sample M points uniformly from S^{D-1}."""
+    u = torch.randn((M, D))
+    u /= torch.norm(u, dim=1, keepdim=True)
+    return u
+
+def sigreg(Z, M=1024, lam=1.0, T=16, rng=None):
+    """SIGReg = average Epps-Pulley statistic over M random projections.
+    
+    Z   : (N, D) batch of embeddings
+    M   : number of random projection directions
+    lam : Gaussian-weight bandwidth
+    T   : number of quadrature knots
+    """
+   
+    t_knots, weights = make_quadrature(lam=lam, T=T)
+    U = random_unit_vectors(M, Z.shape[1])         # (M, D)
+    H = U @ Z.T                                          # (M, N): M projections
+    
+    # Vectorized Epps-Pulley across all M projections
+    angles = t_knots[None, :, None] * H[:, None, :]      # (M, T, N)
+    C = torch.cos(angles).mean(dim=2)                      # (M, T)
+    S = torch.sin(angles).mean(dim=2)                      # (M, T)
+    G = torch.exp(-t_knots ** 2 / 2)                        # (T,)
+    diff_sq = (C - G[None, :]) ** 2 + S ** 2             # (M, T)
+    return Z.shape[0] * (weights * diff_sq).sum(dim=1).mean()  # scalar
+
+class LeWMLoss(nn.Module):
+    def __init__(self, reg_weight=0.1):
+        super().__init__()
+        self.reg_weight = reg_weight
+    
+    def forward(self, z_pred, z_next, z):
+        B, N, D = z.shape
+        pred_loss = (z_pred - z_next).pow(2).mean()
+        sigreg_loss = sigreg(z.reshape(B*N, D))
+        loss = pred_loss + self.reg_weight * sigreg_loss
+        return loss
+
+
+if __name__ == '__main__':
+    z_pred = torch.randn(2, 3, 192)
+    z_next = torch.randn(2, 3, 192)
+    z = torch.randn(2, 4, 192)
+
+    loss = LeWMLoss()
+    print(loss(z_pred, z_next, z))

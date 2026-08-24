@@ -21,7 +21,7 @@ class LeWorldModel(nn.Module):
         )
         self.predictor = AdaLNTransformer(
             d_model=d_model,
-            d_action=2,
+            d_action=10,
             num_heads=16,
             hist_len=3,
             num_layers=6,

@@ -5,11 +5,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "decord>=0.6.0",
+    "einops>=0.8.2",
+    "gym==0.23.1",
     "gym-pusht>=0.1.6",
     "ipykernel>=7.3.0",
+    "matplotlib>=3.10.9",
     "numpy>=2.2.6",
     "pymunk<7",
     "torch>=2.13.0",
+    "torchvision>=0.28.0",
 ]
 
 [[tool.uv.index]]

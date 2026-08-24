@@ -81,7 +81,7 @@ class AdaLNTransformerBlock(nn.Module):
         return x
 
 class AdaLNTransformer(nn.Module):
-    def __init__(self, d_model=192, d_action=2, num_heads=16, hist_len=3, num_layers=6, drop=0.1):
+    def __init__(self, d_model=192, d_action=10, num_heads=16, hist_len=3, num_layers=6, drop=0.1):
         super().__init__()
         self.pos_emb = nn.Parameter(torch.randn(hist_len, d_model))
         self.blocks = nn.ModuleList(

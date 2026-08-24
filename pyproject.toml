@@ -3,8 +3,19 @@ name = "lewm"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
-    "numpy>=2.5.2",
+    "gym-pusht>=0.1.6",
+    "ipykernel>=7.3.0",
+    "numpy>=2.2.6",
+    "pymunk<7",
     "torch>=2.13.0",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130" }]

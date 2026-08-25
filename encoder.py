@@ -16,17 +16,17 @@ class MultiheadSelfAttention(nn.Module):
         self.drop = nn.Dropout(drop)
 
     def forward(self, x):
-        B, T, D = x.shape
-        # B, nh, T, dh
-        q = self.Wq(x).reshape(B, T, self.num_heads, self.d_head).transpose(1, 2)
-        k = self.Wk(x).reshape(B, T, self.num_heads, self.d_head).transpose(1, 2)
-        v = self.Wv(x).reshape(B, T, self.num_heads, self.d_head).transpose(1, 2)
-        # B, nh, T, T
+        B, N, D = x.shape
+        # B, nh, N, dh
+        q = self.Wq(x).reshape(B, N, self.num_heads, self.d_head).transpose(1, 2)
+        k = self.Wk(x).reshape(B, N, self.num_heads, self.d_head).transpose(1, 2)
+        v = self.Wv(x).reshape(B, N, self.num_heads, self.d_head).transpose(1, 2)
+        # B, nh, N, N
         attn_scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_head)
         attn_weights = torch.softmax(attn_scores, dim=-1)
         attn_weights = self.drop(attn_weights)
 
-        x = torch.matmul(attn_weights, v).transpose(1, 2).reshape(B, T, self.d_model)
+        x = torch.matmul(attn_weights, v).transpose(1, 2).reshape(B, N, self.d_model)
         x = self.Wproj(x)
 
         return x
@@ -39,10 +39,11 @@ class LayerNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x):
-        # assume [B, T, D]
+        # assume [B, N, D]
         mean = torch.mean(x, dim=-1, keepdim=True)
         std = torch.std(x, dim=-1, keepdim=True)
-        x = self.gamma * (x - mean) / (std + self.eps) + self.beta
+        x = (x - mean) / (std + self.eps) 
+        x = self.gamma * x + self.beta
         return x
 
 class FeedForward(nn.Module):

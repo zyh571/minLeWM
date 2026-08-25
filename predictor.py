@@ -41,13 +41,16 @@ class AdaptiveLayerNorm(nn.Module):
         self.beta = nn.Linear(d_action, d_model)
         nn.init.zeros_(self.gamma.weight)
         nn.init.zeros_(self.beta.weight)
+        nn.init.ones_(self.gamma.bias)
+        nn.init.ones_(self.beta.bias)
         self.eps = eps
 
     def forward(self, x, a):
-        # x: [B, N, D], a: [B, N, A]
+        # x: [B, T, D], a: [B, T, A]
         mean = torch.mean(x, dim=-1, keepdim=True)
         std = torch.std(x, dim=-1, keepdim=True)
-        x = self.gamma(a) * (x - mean) / (std + self.eps) + self.beta(a)
+        x = (x - mean) / (std + self.eps)
+        x = self.gamma(a) * x + self.beta(a)
         return x
 
 class FeedForward(nn.Module):
@@ -95,7 +98,7 @@ class AdaLNTransformer(nn.Module):
         return x
 
 if __name__ == '__main__':
-    x = torch.randn(1, 3, 192)
-    a = torch.randn(1, 2)
+    x = torch.randn(2, 3, 192)
+    a = torch.randn(2, 3, 10)
     predictor = AdaLNTransformer()
     print(predictor(x, a).shape)

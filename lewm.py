@@ -32,39 +32,35 @@ class LeWorldModel(nn.Module):
         )
     
     def encode(self, x):
-        # [B, N, C, H, W] -> [B*N, T, D]
-        B, N, C, H, W = x.shape
-        x = x.reshape(B*N, C, H, W)
+        # [B, T, C, H, W] -> [B*T, N, D]
+        B, T, C, H, W = x.shape
+        x = x.reshape(B*T, C, H, W)
         x = self.encoder(x)
         _, _, D = x.shape
-        # [B*N, T, D] -> [B*N, D]
+        # get cls_token: [B*T, N, D] -> [B*T, D]
         x = x[:, 0, :].squeeze()
-        # batchnorm is gay so need [B*N, D]
-        x = self.encoder_proj(x).reshape(B, N, D)
+        # batchnorm is gay so need [B*T, D]
+        x = self.encoder_proj(x).reshape(B, T, D)
         return x
     
     def predict(self, x, a):
-        # [B, N, D] -> [B, N, D]
-        B, N, D = x.shape
+        # [B, T, D] -> [B, T, D]
+        B, T, D = x.shape
         x = self.predictor(x, a)
-        x = x.reshape(B*N, D)
-        x = self.predictor_proj(x).reshape(B, N, D)
+        x = x.reshape(B*T, D)
+        x = self.predictor_proj(x).reshape(B, T, D)
         return x
 
     def forward(self, o, a):
-        # x: [B, N, C, H, W], a: [B, N, A]
-        z = self.encode(o) # [B, N, D]
-        z_t = z[:, :-1, :]
-        z_next = z[:, 1:, :]
-
-        a_t = a[:, :-1, :]
-
-        z_pred = self.predict(z_t, a_t)
-        return z_pred, z_next, z
+        # x: [B, T, C, H, W], a: [B, T, A]
+        z = self.encode(o) # [B, T, D]
+        z_pred = self.predict(z[:, :-1, :], a[:, :-1, :])
+        z_targ = z[:, 1:, :]
+        return z_pred, z_targ, z
 
 if __name__ == '__main__':
     o = torch.randn(2, 3+1, 3, 224, 224)
-    a = torch.randn(2, 3+1, 2)
+    a = torch.randn(2, 3+1, 10)
     model = LeWorldModel()
-    z_pred, z_next, z = model(o, a)
-    print(z_pred.shape, z_next.shape, z.shape)
+    z_pred, z_targ, z = model(o, a)
+    print(z_pred.shape, z_targ.shape, z.shape)

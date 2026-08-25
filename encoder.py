@@ -2,7 +2,17 @@ import torch
 from torch import nn
 import math
 
-class MultiheadSelfAttention(nn.Module):
+"""
+The encoder is implemented as a Vision Transformer (ViT) [34]. Unless otherwise specified, we
+use the tiny configuration (∼5M parameters) with a patch size of 14, 12 layers, 3 attention heads,
+and hidden dimensions of 192. The observation embedding zt is constructed from the [CLS] token
+embedding of the last layer, followed by a projection step. The projection step maps the [CLS] token
+embedding into a new representation space using a 1-layer MLP with Batch Normalization [35]. This
+step is necessary because the final ViT layer applies a Layer Normalization [36], which prevents our
+anti-collapse objective from being optimized effectively.
+"""
+
+class SelfAttention(nn.Module):
     def __init__(self, d_model, num_heads, drop):
         super().__init__()
         assert d_model % num_heads == 0
@@ -56,20 +66,20 @@ class FeedForward(nn.Module):
         )
     def forward(self, x):
         x = self.ffn(x)
-        return x        
+        return x
     
 class ViTBlock(nn.Module):
     def __init__(self, d_model, num_heads, drop):
         super().__init__()
         self.norm1 = LayerNorm(d_model)
-        self.msa = MultiheadSelfAttention(d_model, num_heads, drop)
+        self.attn = SelfAttention(d_model, num_heads, drop)
         self.norm2 = LayerNorm(d_model)
         self.mlp = FeedForward(d_model)
         self.drop = nn.Dropout(drop)
 
     def forward(self, x):
         h = self.norm1(x)
-        h = self.drop(self.msa(h))
+        h = self.drop(self.attn(h))
         x = x + h
         h = self.norm2(x)
         h = self.drop(self.mlp(h))

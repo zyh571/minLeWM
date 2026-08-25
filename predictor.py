@@ -2,7 +2,17 @@ import torch
 from torch import nn
 import math
 
-class MultiHeadAttention(nn.Module):
+"""
+The predictor is a transformer with 6 layers, 16 attention heads, and 10% dropout (∼10M parameters).
+Actions are incorporated into the predictor through Adaptive Layer Normalization (AdaLN) [37]
+applied at each layer. The AdaLN parameters are initialized to zero to stabilize training and ensure
+that action conditioning impacts the predictor training progressively. The predictor takes as input a
+history of N frame representations and predicts the next frame representation auto-regressively with
+temporal causal masking to avoid looking at future embeddings. The predictor is also followed by a
+projector network with the same implementation as the one used for the encoder.
+"""
+
+class CausalAttention(nn.Module):
     def __init__(self, d_model, num_heads, hist_len, drop):
         super().__init__()
         assert d_model % num_heads == 0
@@ -69,14 +79,14 @@ class AdaLNTransformerBlock(nn.Module):
     def __init__(self, d_model, d_action, num_heads, hist_len, drop):
         super().__init__()
         self.norm1 = AdaptiveLayerNorm(d_model, d_action)
-        self.msa = MultiHeadAttention(d_model, num_heads, hist_len, drop)
+        self.attn = CausalAttention(d_model, num_heads, hist_len, drop)
         self.norm2 = AdaptiveLayerNorm(d_model, d_action)
         self.mlp = FeedForward(d_model)
         self.drop = nn.Dropout(drop)
 
     def forward(self, x, a):
         h = self.norm1(x, a)
-        h = self.drop(self.msa(h))
+        h = self.drop(self.attn(h))
         x = x + h
         h = self.norm2(x, a)
         h = self.drop(self.mlp(h))

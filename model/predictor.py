@@ -106,9 +106,3 @@ class AdaLNTransformer(nn.Module):
         for block in self.blocks:
             x = block(x, a)
         return x
-
-if __name__ == '__main__':
-    x = torch.randn(2, 3, 192)
-    a = torch.randn(2, 3, 10)
-    predictor = AdaLNTransformer()
-    print(predictor(x, a).shape)

@@ -121,8 +121,3 @@ class DecoderTransformer(nn.Module):
         q = q.reshape(B, self.grid_size, self.grid_size, self.d_model).permute(0, 3, 1, 2)
         q = self.convt(q)
         return q
-
-if __name__ == '__main__':
-    cls = torch.randn(2, 192)
-    decoder = DecoderTransformer()
-    print(decoder(cls).shape)

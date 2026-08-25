@@ -1,5 +1,5 @@
 import torch
-from lewm import LeWorldModel
+from model.lewm import LeWorldModel
 
 # Cross Entropy Method + receding-horizon Model Predictive Control for one env
 

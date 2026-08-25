@@ -1,5 +1,5 @@
-from encoder import ViT
-from predictor import AdaLNTransformer
+from model.encoder import ViT
+from model.predictor import AdaLNTransformer
 
 import torch
 from torch import nn
@@ -57,10 +57,3 @@ class LeWorldModel(nn.Module):
         z_pred = self.predict(z[:, :-1, :], a[:, :-1, :])
         z_targ = z[:, 1:, :]
         return z_pred, z_targ, z
-
-if __name__ == '__main__':
-    o = torch.randn(2, 3+1, 3, 224, 224)
-    a = torch.randn(2, 3+1, 10)
-    model = LeWorldModel()
-    z_pred, z_targ, z = model(o, a)
-    print(z_pred.shape, z_targ.shape, z.shape)

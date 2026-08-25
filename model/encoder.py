@@ -124,8 +124,3 @@ class ViT(nn.Module):
             x = block(x)
 
         return x
-
-if __name__ == '__main__':
-    x = torch.randn(2, 3, 224, 224)
-    vit = ViT()
-    print(vit(x).shape)

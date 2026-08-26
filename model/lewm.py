@@ -4,9 +4,17 @@ from model.predictor import AdaLNTransformer
 import torch
 from torch import nn
 
+"""
+We apply a frame-skip of 5, grouping consecutive actions between frames into a single action block.
+This choice enables computationally efficient longer-horizon predictions while maintaining informa-
+tive temporal transitions. We use a batch size of 128 with sub-trajectories of size 4 corresponding to
+4 frames and 4 blocks of 5 actions. Each frame is 224 × 224 pixels
+"""
+
 class LeWorldModel(nn.Module):
     def __init__(self, d_model=192,):
         super().__init__()
+        self.d_model = d_model
         self.encoder = ViT(
             img_channels=3,
             img_size=224,

@@ -46,7 +46,7 @@ class LeWorldModel(nn.Module):
         x = self.encoder(x)
         _, _, D = x.shape
         # get cls_token: [B*T, N, D] -> [B*T, D]
-        x = x[:, 0, :].squeeze()
+        x = x[:, 0, :]
         # batchnorm is gay so need [B*T, D]
         x = self.encoder_proj(x).reshape(B, T, D)
         return x

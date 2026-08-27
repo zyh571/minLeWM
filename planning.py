@@ -1,5 +1,7 @@
 import torch
-from model.lewm import LeWorldModel
+from einops import rearrange
+
+from dataset.pusht_dset import ACTION_MEAN, ACTION_STD
 
 """
 Planning solver. For planning, we use the Cross-Entropy Method (CEM). At each planning step,
@@ -13,7 +15,7 @@ follows the setup used in [18].
 """
 
 @torch.no_grad()
-def cross_entropy_method(model, o_init, a_init, o_goal,
+def cross_entropy_method(model, o_goal, o_init, a_init,
                          H=5, N=300, K=30, T=30,
                          device='cuda' if torch.cuda.is_available() else 'cpu'):
     """
@@ -77,7 +79,71 @@ def cross_entropy_method(model, o_init, a_init, o_goal,
 
 
 
-    
-# interacts with the environment?
-def model_predictive_control():
-    pass
+"""
+The evaluation budget corresponds to the maximum number of actions the agent is allowed
+to execute in the environment. The goal distance determines how far in the future the goal state
+is sampled relative to the initial state. During evaluation, trajectories are sampled from the offline
+dataset. The initial state is chosen by randomly sampling a state from a trajectory in the dataset,
+while the goal state corresponds to a state occurring several timesteps later in the same trajectory.
+This ensures that the goal is reachable and consistent with the dataset dynamics. In TwoRoom, the
+evaluation budget is set to 50 steps, and the goal state is sampled 25 timesteps in the future. In PushT,
+the evaluation budget is 50 steps and the goal is sampled 25 timesteps in the future. In OGBench-Cube
+and Reacher, the evaluation budget is 50 steps, and the goal is sampled 25 timesteps in the future.
+"""
+def preprocess(visual):
+    """Env frame (H, W, C) uint8 -> (C, H, W) float in [0,1]"""
+    x = torch.from_numpy(visual).float() / 255.0
+    return rearrange(x, "h w c -> c h w")
+
+@torch.no_grad()
+def model_predictive_control(model, env, o_goal, o_init, a_init, 
+                             H=5, N=300, K=30, T=30,
+                             budget=50, frameskip=5,
+                             action_mean=ACTION_MEAN, action_std=ACTION_STD, transform=None,
+                             device='cuda' if torch.cuda.is_available() else 'cpu'):
+    """
+    Args:
+        model, o_goal, o_init, a_init, H, N, K, T: cross_entropy_method arguments
+        env: simulation environment set to final o_init state
+        budget: maximum allowed environment steps
+        frameskip: step interval between the observations given to model
+        action_mean, action_std: dataset statistics used to normalise/unnormalise actions
+        transform: same dataset transform applied to env visual
+    """
+    model.to(device)
+    o_init = o_init.to(device)
+    a_init = a_init.to(device)
+    o_goal = o_goal.to(device)
+    action_std = action_std.to(device)
+    action_mean = action_mean.to(device)
+    model.eval()
+
+    steps = 0
+    info = {}
+    costs = []
+
+    while steps < budget:
+        plan, _, _, cost = cross_entropy_method(
+            model, o_goal, o_init, a_init, H, N, K, T, device)
+        costs.append(cost.item())
+        
+        for block in plan:
+            subs = rearrange(block, "(f d) -> f d", f=frameskip)
+            subs = subs * action_std + action_mean
+
+            for act in subs:
+                obs, _, _, info = env.step(act.cpu().numpy())
+                steps += 1
+                if steps >= budget:
+                    break
+
+            o_new = preprocess(obs["visual"]).to(device)
+            if transform is not None:
+                o_new = transform(o_new)
+            o_init = torch.cat([o_init[1:], o_new[None]], dim=0)
+            a_init = torch.cat([a_init[1:], block[None]], dim=0)
+
+            if steps >= budget:
+                break
+
+    return info.get("max_coverage", 0.0), costs

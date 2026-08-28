@@ -1,12 +1,11 @@
 # minLeWM
 
-**🚧 Work in Progress 🚧**
-
 A minimal PyTorch implementation of "LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels" by Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, Randall Balestriero [[1](#references)]
 
 minLeWM is an attempt to implement LeWorldModel from scratch by only following the paper to the best of my interpretation as a fun exercise. 
 
 ## Status
+**🚧 Work in Progress 🚧**
 - [x] Setup: environment, dataset
 - [x] Model architecture: encoder, predictor, decoder
 - [x] Loss function: MSE loss, SIGReg regularisation

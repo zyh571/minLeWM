@@ -9,4 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
+# Local data
 dataset/data/
+runs/

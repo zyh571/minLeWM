@@ -14,15 +14,26 @@ def report_success(func):
     return wrapper
 
 @report_success
-def test_lewm_shape():
+def test_lewm_forward():
+    model = LeWorldModel()
     o = torch.randn(2, 3+1, 3, 224, 224)
     a = torch.randn(2, 3+1, 10)
+    out = model(o, a)
+    assert set(out) == {"loss", "pred_loss", "sigreg_loss"}, out.keys()
+    for k, v in out.items():
+        assert v.dim() == 0, f"{k} is not scalar: {v.shape}"
+        assert torch.isfinite(v), f"{k} is {v}"
+    assert out["loss"].requires_grad
+
+@report_success
+def test_lewm_backward():
     model = LeWorldModel()
-    z_pred, z_targ, z = model(o, a)
-    #print(z_pred.shape, z_targ.shape, z.shape)
-    assert z_pred.shape == (2, 3, 192), "lewm (z_pred) shape mismatch"
-    assert z_targ.shape == (2, 3, 192), "lewm (z_targ) shape mismatch"
-    assert z.shape == (2, 4, 192), "lewm (z) shape mismatch"
+    o = torch.randn(2, 3+1, 3, 224, 224)
+    a = torch.randn(2, 3+1, 10)
+    out = model(o, a)
+    out["loss"].backward()
+    dead = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not dead, f"no gradient reached: {dead[:5]}"
 
 @report_success
 def test_encoder_shape():

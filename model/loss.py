@@ -42,23 +42,20 @@ def sigreg(Z, M=1024, lam=1.0, T=16, rng=None):
     diff_sq = (C - G[None, :]) ** 2 + S ** 2             # (M, T)
     return Z.shape[0] * (weights * diff_sq).sum(dim=1).mean()  # scalar
 
+
 class LeWMLoss(nn.Module):
     def __init__(self, reg_weight=0.1):
         super().__init__()
         self.reg_weight = reg_weight
     
-    def forward(self, z_pred, z_next, z):
-        B, N, D = z.shape
-        pred_loss = (z_pred - z_next).pow(2).mean()
-        sigreg_loss = sigreg(z.reshape(B*N, D))
+    def forward(self, z_pred, z_target, z):
+        B, T, D = z.shape
+        pred_loss = (z_pred - z_target).pow(2).mean()
+        sigreg_loss = sigreg(z.reshape(B*T, D))
         loss = pred_loss + self.reg_weight * sigreg_loss
-        return loss
+        return {
+            'loss': loss, 
+            'pred_loss': pred_loss, 
+            'sigreg_loss': sigreg_loss
+        }
 
-
-if __name__ == '__main__':
-    z_pred = torch.randn(2, 3, 192)
-    z_next = torch.randn(2, 3, 192)
-    z = torch.randn(2, 4, 192)
-
-    loss = LeWMLoss()
-    print(loss(z_pred, z_next, z))

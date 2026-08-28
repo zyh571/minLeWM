@@ -1,8 +1,9 @@
-from model.encoder import ViT
-from model.predictor import AdaLNTransformer
-
 import torch
 from torch import nn
+
+from model.encoder import ViT
+from model.predictor import AdaLNTransformer
+from model.loss import LeWMLoss
 
 """
 We apply a frame-skip of 5, grouping consecutive actions between frames into a single action block.
@@ -38,6 +39,7 @@ class LeWorldModel(nn.Module):
             nn.Linear(d_model, d_model),
             nn.BatchNorm1d(d_model),
         )
+        self.criterion = LeWMLoss(reg_weight=0.1)
     
     def encode(self, x):
         # [B, T, C, H, W] -> [B*T, N, D]
@@ -64,4 +66,5 @@ class LeWorldModel(nn.Module):
         z = self.encode(o) # [B, T, D]
         z_pred = self.predict(z[:, :-1, :], a[:, :-1, :])
         z_targ = z[:, 1:, :]
-        return z_pred, z_targ, z
+        loss_dict = self.criterion(z_pred, z_targ, z)
+        return loss_dict
